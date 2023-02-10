@@ -1,0 +1,54 @@
+import socket
+import ssl
+
+def start_proxy(port=8080):
+    # Create a socket to listen for incoming connections
+    listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listen_socket.bind(('', port))
+    listen_socket.listen(1)
+    print("Proxy listening on port {}".format(port))
+
+    while True:
+        # Accept an incoming connection
+        client_socket, client_address = listen_socket.accept()
+        print("Accepted connection from {}".format(client_address))
+
+        # Receive the request from the client
+        request = client_socket.recv(4096)
+        print("Received request:")
+        print(request.decode())
+
+        # Parse the request to determine the target host and port
+        lines = request.decode().split("\r\n")
+        host = None
+        port = 80
+        for line in lines:
+            if line.startswith("Host:"):
+                host = line.split(":")[1].strip()
+
+        # Connect to the target host
+        target_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        target_socket.connect((host, port))
+        print("Connected to target host {} on port {}".format(host, port))
+
+        # Forward the request to the target host
+        target_socket.sendall(request)
+
+        # Receive the response from the target host
+        response = b""
+        while True:
+            data = target_socket.recv(4096)
+            if not data:
+                break
+            response += data
+
+        # Forward the response back to the client
+        client_socket.sendall(response)
+
+        # Close the connections
+        target_socket.close()
+        client_socket.close()
+        print("Closed connection to {}".format(client_address))
+
+if __name__ == '__main__':
+    start_proxy()
